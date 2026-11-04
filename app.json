@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "MediMind",
+    "slug": "medimind-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.medimind.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "09a3c1f7-4128-428f-8945-838c4f44215a"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-splash-screen"
+    ]
+  }
+}
