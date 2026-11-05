@@ -2,12 +2,12 @@ import { apiFetch } from '../lib/api';
 
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Medication {
@@ -26,6 +26,10 @@ export default function HistoryScreen() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -35,7 +39,14 @@ export default function HistoryScreen() {
       const response = await apiFetch('/api/v1/prescriptions');
 
       if (!response.ok) {
-        throw new Error('Unable to load prescription history.');
+        let message = 'Unable to load prescription history.';
+        try {
+          const body = await response.json();
+          message = body.detail || message;
+        } catch {
+          // Keep the default message if the response is not JSON.
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -65,6 +76,77 @@ export default function HistoryScreen() {
     });
   };
 
+  const deletePrescription = async (prescriptionId: number) => {
+    if (deletingId !== null || clearingAll) return;
+
+    setDeletingId(prescriptionId);
+    setError('');
+
+    try {
+      const response = await apiFetch(
+        `/api/v1/prescriptions/${prescriptionId}`,
+        { method: 'DELETE' },
+      );
+
+      if (!response.ok) {
+        let message = 'Unable to delete this prescription.';
+        try {
+          const body = await response.json();
+          message = body.detail || message;
+        } catch {
+          // Keep the default message if the response is not JSON.
+        }
+        throw new Error(message);
+      }
+
+      setPrescriptions((current) =>
+        current.filter((item) => item.id !== prescriptionId),
+      );
+      setPendingDeleteId(null);
+    } catch (err: any) {
+      setError(err.message || 'Could not delete this prescription.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const deleteAllPrescriptions = async () => {
+    if (clearingAll || deletingId !== null) return;
+
+    setClearingAll(true);
+    setError('');
+
+    try {
+      const response = await apiFetch('/api/v1/prescriptions', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        let message = 'Unable to clear prescription history.';
+        try {
+          const body = await response.json();
+          message = body.detail || message;
+        } catch {
+          // Keep the default message if the response is not JSON.
+        }
+        throw new Error(message);
+      }
+
+      setPrescriptions([]);
+      setConfirmClearAll(false);
+      setPendingDeleteId(null);
+    } catch (err: any) {
+      setError(err.message || 'Could not clear prescription history.');
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
+  const medicationCount = prescriptions.reduce(
+    (total, item) => total + (item.medications?.length || 0),
+    0,
+  );
+
   return (
     <ScrollView
       style={styles.container}
@@ -87,36 +169,75 @@ export default function HistoryScreen() {
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryNumber}>
-            {loading
-              ? '—'
-              : prescriptions.reduce(
-                  (total, item) => total + (item.medications?.length || 0),
-                  0
-                )}
+            {loading ? '—' : medicationCount}
           </Text>
           <Text style={styles.summaryLabel}>Medication entries</Text>
         </View>
       </View>
 
+      {!loading && !error && prescriptions.length > 0 && (
+        <View style={styles.clearAllContainer}>
+          {confirmClearAll ? (
+            <View style={styles.confirmCard}>
+              <Text style={styles.confirmTitle}>Delete all prescriptions?</Text>
+              <Text style={styles.confirmDescription}>
+                This permanently deletes all prescriptions in your account and
+                their associated medication records. Your separately configured
+                medication reminders will be kept.
+              </Text>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setConfirmClearAll(false)}
+                  disabled={clearingAll}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.confirmDeleteButton}
+                  onPress={deleteAllPrescriptions}
+                  disabled={clearingAll}
+                >
+                  {clearingAll ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.confirmDeleteText}>Delete all</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.clearAllButton}
+              onPress={() => {
+                setPendingDeleteId(null);
+                setConfirmClearAll(true);
+              }}
+              disabled={deletingId !== null || clearingAll}
+            >
+              <Text style={styles.clearAllText}>Clear all history</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent activity</Text>
-        <TouchableOpacity onPress={loadHistory}>
+        <TouchableOpacity onPress={loadHistory} disabled={loading || clearingAll || deletingId !== null}>
           <Text style={styles.refreshText}>Refresh ↻</Text>
         </TouchableOpacity>
       </View>
+
+      {error ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.stateCard}>
           <ActivityIndicator size="large" color="#0D9488" />
           <Text style={styles.stateText}>Loading your records...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.stateCard}>
-          <Text style={styles.stateTitle}>Couldn't load history</Text>
-          <Text style={styles.stateText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadHistory}>
-            <Text style={styles.retryText}>Try again</Text>
-          </TouchableOpacity>
         </View>
       ) : prescriptions.length === 0 ? (
         <View style={styles.stateCard}>
@@ -180,6 +301,47 @@ export default function HistoryScreen() {
                 </Text>
               </View>
             ) : null}
+
+            {pendingDeleteId === prescription.id ? (
+              <View style={styles.inlineConfirm}>
+                <Text style={styles.confirmTitle}>Delete this prescription?</Text>
+                <Text style={styles.confirmDescription}>
+                  Its associated medication entries will also be deleted.
+                  Any linked reminders will be preserved.
+                </Text>
+                <View style={styles.confirmActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => setPendingDeleteId(null)}
+                    disabled={deletingId !== null}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmDeleteButton}
+                    onPress={() => deletePrescription(prescription.id)}
+                    disabled={deletingId !== null}
+                  >
+                    {deletingId === prescription.id ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.confirmDeleteText}>Delete</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => {
+                  setConfirmClearAll(false);
+                  setPendingDeleteId(prescription.id);
+                }}
+                disabled={deletingId !== null || clearingAll}
+              >
+                <Text style={styles.deleteButtonText}>Delete prescription</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ))
       )}
@@ -231,7 +393,7 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   summaryCard: {
     flex: 1,
@@ -250,6 +412,85 @@ const styles = StyleSheet.create({
     color: '#8293A5',
     fontSize: 11,
     marginTop: 5,
+  },
+  clearAllContainer: {
+    marginBottom: 25,
+  },
+  clearAllButton: {
+    alignSelf: 'flex-end',
+    borderWidth: 1,
+    borderColor: '#F0C9C9',
+    backgroundColor: '#FFF7F7',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  clearAllText: {
+    color: '#B42318',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  confirmCard: {
+    backgroundColor: '#FFF7F7',
+    borderColor: '#F0C9C9',
+    borderWidth: 1,
+    borderRadius: 13,
+    padding: 16,
+  },
+  inlineConfirm: {
+    marginTop: 16,
+    backgroundColor: '#FFF7F7',
+    borderColor: '#F0C9C9',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 13,
+  },
+  confirmTitle: {
+    color: '#102A43',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  confirmDescription: {
+    color: '#64788B',
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 6,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 9,
+    marginTop: 13,
+  },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: '#D8E1E8',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: 9,
+    minWidth: 75,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#52677A',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  confirmDeleteButton: {
+    backgroundColor: '#B42318',
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: 9,
+    minWidth: 85,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -293,17 +534,18 @@ const styles = StyleSheet.create({
     color: '#0D9488',
     fontSize: 34,
   },
-  retryButton: {
-    backgroundColor: '#0F766E',
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-    borderRadius: 10,
-    marginTop: 17,
+  errorCard: {
+    backgroundColor: '#FFF7F7',
+    borderColor: '#F0C9C9',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 13,
+    marginBottom: 14,
   },
-  retryText: {
-    color: '#FFFFFF',
+  errorText: {
+    color: '#B42318',
     fontSize: 12,
-    fontWeight: '800',
+    lineHeight: 18,
   },
   prescriptionCard: {
     backgroundColor: '#FFFFFF',
@@ -392,6 +634,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     marginTop: 6,
+  },
+  deleteButton: {
+    alignSelf: 'flex-start',
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#F0C9C9',
+    backgroundColor: '#FFF7F7',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  deleteButtonText: {
+    color: '#B42318',
+    fontSize: 11,
+    fontWeight: '800',
   },
   notesCard: {
     backgroundColor: '#F3F7FA',
