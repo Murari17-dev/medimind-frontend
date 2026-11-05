@@ -58,6 +58,75 @@ export default function HomeScreen() {
     }
   };
 
+  const deletePrescription = async (prescriptionId: number) => {
+    const confirmed =
+      Platform.OS === 'web'
+        ? window.confirm(`Delete prescription #${prescriptionId}? This will also delete its saved medication entries. Existing medication reminders will be kept.`)
+        : await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Delete prescription?',
+              'This will also delete its saved medication entries. Existing medication reminders will be kept.',
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) }
+            );
+          });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await apiFetch(`/api/v1/prescriptions/${prescriptionId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Unable to delete this prescription.');
+      }
+
+      await fetchHistory();
+    } catch (error: any) {
+      showError('Deletion failed', error.message || 'Could not delete this prescription.');
+    }
+  };
+
+  const clearPrescriptionHistory = async () => {
+    const confirmed =
+      Platform.OS === 'web'
+        ? window.confirm('Delete ALL prescription history? This cannot be undone. Saved medication entries will also be deleted. Existing medication reminders will be kept.')
+        : await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Clear all prescription history?',
+              'This cannot be undone. Saved medication entries will also be deleted. Existing medication reminders will be kept.',
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Delete all', style: 'destructive', onPress: () => resolve(true) },
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) }
+            );
+          });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await apiFetch('/api/v1/prescriptions', {
+        method: 'DELETE',
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Unable to clear prescription history.');
+      }
+
+      setHistory([]);
+      await fetchHistory();
+    } catch (error: any) {
+      showError('Could not clear history', error.message || 'Please try again.');
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
   }, []);
@@ -167,7 +236,7 @@ export default function HomeScreen() {
         <View style={styles.scanCard}>
           <View style={styles.scanCardTop}>
             <View style={styles.scanIcon}>
-              <Text style={styles.scanIconText}>✦</Text>
+              <Text style={styles.scanIconText}>âœ¦</Text>
             </View>
             <View style={styles.scanLabel}>
               <Text style={styles.scanLabelTitle}>AI PRESCRIPTION SCANNER</Text>
@@ -187,12 +256,12 @@ export default function HomeScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.scanButtonText}>
-              {loading ? 'Processing...' : '＋  Upload prescription'}
+              {loading ? 'Processing...' : 'ï¼‹  Upload prescription'}
             </Text>
           </TouchableOpacity>
 
           <Text style={styles.scanFootnote}>
-            JPG, PNG or WEBP · Maximum 10 MB
+            JPG, PNG or WEBP Â· Maximum 10 MB
           </Text>
         </View>
 
@@ -313,7 +382,7 @@ export default function HomeScreen() {
 
         {activeTab === 'scanner' ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>▧</Text>
+            <Text style={styles.emptyIcon}>â–§</Text>
             <Text style={styles.emptyTitle}>Ready for your next scan</Text>
             <Text style={styles.emptyDescription}>
               Your newly processed prescriptions will appear here.
@@ -321,9 +390,23 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.historySection}>
+            {history.length > 0 ? (
+              <View style={styles.historyActions}>
+                <Text style={styles.historyActionHint}>
+                  {history.length} saved {history.length === 1 ? 'prescription' : 'prescriptions'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.clearHistoryButton}
+                  onPress={clearPrescriptionHistory}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.clearHistoryButtonText}>Clear all history</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             {history.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyIcon}>▤</Text>
+                <Text style={styles.emptyIcon}>â–¤</Text>
                 <Text style={styles.emptyTitle}>No prescriptions yet</Text>
                 <Text style={styles.emptyDescription}>
                   Your saved prescription records will appear here.
@@ -333,12 +416,23 @@ export default function HomeScreen() {
               history.map((item, index) => (
                 <View key={item.id ?? index} style={styles.historyCard}>
                   <View style={styles.historyHeader}>
-                    <Text style={styles.historyTitle}>
-                      Prescription #{item.id}
-                    </Text>
-                    <Text style={styles.historyCount}>
-                      {item.medications?.length || 0} medications
-                    </Text>
+                    <View style={styles.historyHeadingText}>
+                      <Text style={styles.historyTitle}>
+                        Prescription #{item.id}
+                      </Text>
+                      <Text style={styles.historyCount}>
+                        {item.medications?.length || 0} medications
+                      </Text>
+                    </View>
+                    {item.id != null ? (
+                      <TouchableOpacity
+                        style={styles.deletePrescriptionButton}
+                        onPress={() => deletePrescription(item.id as number)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.deletePrescriptionButtonText}>Delete</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
 
                   {item.doctor_notes ? (
@@ -347,7 +441,7 @@ export default function HomeScreen() {
 
                   {item.medications?.map((med, idx) => (
                     <Text key={idx} style={styles.historyMedication}>
-                      • {med.name} · {med.dosage}
+                      â€¢ {med.name} Â· {med.dosage}
                     </Text>
                   ))}
                 </View>
@@ -753,6 +847,44 @@ const styles = StyleSheet.create({
   },
   historySection: {
     gap: 12,
+  },
+  historyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 3,
+  },
+  historyActionHint: {
+    color: '#71869A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  clearHistoryButton: {
+    backgroundColor: '#FCEEEE',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  clearHistoryButtonText: {
+    color: '#B42318',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  historyHeadingText: {
+    flex: 1,
+  },
+  deletePrescriptionButton: {
+    backgroundColor: '#FFF3E9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 9,
+    marginLeft: 10,
+  },
+  deletePrescriptionButtonText: {
+    color: '#A65320',
+    fontSize: 11,
+    fontWeight: '800',
   },
   historyCard: {
     backgroundColor: '#FFFFFF',
