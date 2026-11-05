@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/api';
 
 import { useEffect, useState } from 'react';
 import {
@@ -8,8 +9,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
-const API_BASE_URL = 'https://medimind-backend-8mbb.onrender.com';
 
 interface Medication {
   name: string;
@@ -35,7 +34,7 @@ export default function MedicationsScreen() {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/prescriptions`);
+      const response = await apiFetch('/api/v1/prescriptions');
 
       if (!response.ok) {
         throw new Error('Unable to retrieve medication records.');

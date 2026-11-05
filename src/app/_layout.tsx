@@ -1,3 +1,4 @@
+import AuthGate from '../components/AuthGate';
 
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
@@ -12,6 +13,7 @@ const icons: Record<string, string> = {
 
 export default function RootLayout() {
   return (
+    <AuthGate>
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -41,5 +43,6 @@ export default function RootLayout() {
       <Tabs.Screen name="history" options={{ title: 'History' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
+    </AuthGate>
   );
 }

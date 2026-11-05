@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 
 import React from 'react';
 import {
@@ -71,6 +72,16 @@ export default function ProfileScreen() {
           <Text style={styles.activeText}>Active</Text>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={styles.signOutButton}
+        onPress={async () => {
+          const { error } = await supabase.auth.signOut();
+          if (error) showMessage('Sign out failed', error.message);
+        }}
+      >
+        <Text style={styles.signOutText}>Sign out</Text>
+      </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>Preferences</Text>
 
@@ -175,6 +186,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 25,
   },
+  signOutButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1C9C9',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  signOutText: { color: '#B42318', fontSize: 14, fontWeight: '700' },
   profileCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,

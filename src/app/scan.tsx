@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/api';
 
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
@@ -14,8 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-const API_BASE_URL = 'https://medimind-backend-8mbb.onrender.com';
 
 interface Medication {
   name: string;
@@ -63,8 +62,8 @@ export default function ScanScreen() {
 
         formData.append('file', asset.file);
 
-        response = await fetch(
-          `${API_BASE_URL}/api/v1/parse-prescription`,
+        response = await apiFetch(
+          '/api/v1/parse-prescription',
           {
             method: 'POST',
             body: formData,

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/api';
 
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
@@ -14,8 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-const API_BASE_URL = 'https://medimind-backend-8mbb.onrender.com';
 
 interface Medication {
   name: string;
@@ -48,7 +47,7 @@ export default function HomeScreen() {
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/prescriptions`);
+      const response = await apiFetch('/api/v1/prescriptions');
       const data = await response.json();
 
       if (response.ok) {
@@ -71,8 +70,8 @@ export default function HomeScreen() {
     formData.append('file', file);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/parse-prescription`,
+      const response = await apiFetch(
+        '/api/v1/parse-prescription',
         {
           method: 'POST',
           body: formData,
