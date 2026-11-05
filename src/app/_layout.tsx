@@ -7,6 +7,7 @@ const icons: Record<string, string> = {
   index: '⌂',
   scan: '＋',
   medications: '▤',
+  reminders: '◷',
   history: '◷',
   profile: '○',
 };
@@ -40,6 +41,7 @@ export default function RootLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="scan" options={{ title: 'Scan' }} />
       <Tabs.Screen name="medications" options={{ title: 'Medicines' }} />
+      <Tabs.Screen name="reminders" options={{ title: 'Reminders' }} />
       <Tabs.Screen name="history" options={{ title: 'History' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
