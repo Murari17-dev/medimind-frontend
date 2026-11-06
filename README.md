@@ -1,56 +1,82 @@
-# Welcome to your Expo app 👋
+# MediMind – AI-Powered Healthcare Assistant
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+MediMind is an AI-powered healthcare application designed to simplify prescription management and medication tracking. It allows users to scan prescriptions, organize medication information, and manage reminders through a centralized interface.
 
-## Get started
+## 🎥 Project Demo
 
-1. Install dependencies
+[**▶ Watch MediMind Demo**](demo/MediMind_Demo.mp4)
 
-   ```bash
-   npm install
-   ```
+## ✨ Features
 
-2. Start the app
+- **Prescription Scanning:** Upload and scan medical prescriptions to extract relevant information using AI.
+- **AI-Powered Processing:** Uses AI-based processing to interpret prescription information.
+- **Medication Management:** Organize and manage medications extracted from prescriptions.
+- **Medication Reminders:** Set medication reminders and receive desktop notifications.
+- **Prescription History:** Access previously scanned prescriptions.
+- **Prescription Deletion:** Delete individual prescriptions or clear prescription history.
+- **User Authentication:** Secure registration and login functionality.
+- **Cloud Database:** Store and retrieve user-specific prescription and medication data.
 
-   ```bash
-   npx expo start
-   ```
+## 🛠️ Technology Stack
 
-In the output, you'll find options to open the app in a
+| Component | Technologies |
+|---|---|
+| Frontend | React Native, Expo, TypeScript |
+| Backend | Python, FastAPI |
+| Database | Supabase, PostgreSQL |
+| Authentication | Supabase Auth |
+| AI Integration | AI model API |
+| Deployment | Vercel, Render |
+| Desktop | Electron |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🏗️ Architecture
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+MediMind follows a client-server architecture.
 
-## Get a fresh project
+1. **Frontend:** Expo-based application providing the user interface.
+2. **Backend:** FastAPI handles API requests, prescription processing, and application logic.
+3. **AI Processing:** AI models assist with extracting and interpreting prescription information.
+4. **Database:** Supabase PostgreSQL stores application data.
+5. **Authentication:** Supabase Auth manages user authentication and account isolation.
 
-When you're ready, run:
+## 🚀 Live Application
+
+[Open MediMind](https://medimind-frontend-eta.vercel.app/)
+
+## 💻 Running Locally
+
+### Frontend
 
 ```bash
-npm run reset-project
+git clone https://github.com/Murari17-dev/medimind-frontend.git
+
+cd medimind-frontend
+
+npm install
+
+npx expo start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+### Backend
 
-### Other setup steps
+```bash
+git clone https://github.com/Murari17-dev/medimind-backend.git
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+cd medimind-backend
 
-## Learn more
+pip install -r requirements.txt
 
-To learn more about developing your project with Expo, look at the following resources:
+uvicorn main:app --reload
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Configure the required environment variables for Supabase and the backend API before running the application.
 
-## Join the community
+## 👨‍💻 Developer
 
-Join our community of developers creating universal apps.
+Developed as a healthcare technology project combining AI, full-stack development, cloud database management, and application deployment.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**GitHub:** [Murari17-dev](https://github.com/Murari17-dev)
+
+---
+
+*Disclaimer: MediMind is intended as a prescription organization and medication management tool. It is not a substitute for professional medical advice or diagnosis.*
