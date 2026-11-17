@@ -1,7 +1,8 @@
 import AuthGate from '../components/AuthGate';
 
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Text, Platform } from 'react-native';
+import { useEffect } from 'react';
 
 const icons: Record<string, string> = {
   index: '⌂',
@@ -13,6 +14,11 @@ const icons: Record<string, string> = {
 };
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
+      void navigator.serviceWorker.register('/sw.js');
+    }
+  }, []);
   return (
     <AuthGate>
     <Tabs
