@@ -43,7 +43,7 @@ export function useDueReminders() {
   });
 
   const acknowledge = useCallback(
-    async (item: DueReminder) => {
+    async (item: DueReminder, revalidate = true) => {
       const claim = await apiJson<{ claimed: boolean; claim_token?: string }>(
         `${REMINDERS_KEY}/${item.id}/claim`,
         {
@@ -60,7 +60,9 @@ export function useDueReminders() {
         );
       }
 
-      await swr.mutate();
+      if (revalidate) {
+        await swr.mutate();
+      }
     },
     [swr],
   );

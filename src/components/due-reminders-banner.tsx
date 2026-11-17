@@ -18,7 +18,7 @@ const formatTime = (iso: string) => {
 
 export function DueRemindersBanner() {
   const insets = useSafeAreaInsets();
-  const { data, acknowledge } = useDueReminders();
+  const { data, acknowledge, mutate } = useDueReminders();
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const items = data ?? [];
@@ -28,14 +28,28 @@ export function DueRemindersBanner() {
 
   const dismiss = async (targets: DueReminder[]) => {
     setBusyKey(targets.length === 1 ? keyOf(targets[0]) : 'all');
+
+    let failureMessage: string | undefined;
     try {
+      // Defer SWR revalidation until the batch finishes. Revalidating after
+      // every item adds one unnecessary GET per reminder.
       for (const item of targets) {
-        await acknowledge(item);
+        await acknowledge(item, false);
       }
     } catch (error: any) {
-      notify('Could not update reminder', error?.message || 'Please try again.');
+      failureMessage = error?.message || 'Please try again.';
+    }
+
+    try {
+      await mutate();
+    } catch (error: any) {
+      failureMessage ??= error?.message || 'Please try again.';
     } finally {
       setBusyKey(null);
+    }
+
+    if (failureMessage) {
+      notify('Could not update reminder', failureMessage);
     }
   };
 
