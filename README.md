@@ -11,7 +11,7 @@ MediMind is an AI-powered healthcare application designed to simplify prescripti
 - **Prescription Scanning:** Upload and scan medical prescriptions to extract relevant information using AI.
 - **AI-Powered Processing:** Uses AI-based processing to interpret prescription information.
 - **Medication Management:** Organize and manage medications extracted from prescriptions.
-- **Medication Reminders:** Set medication reminders and receive desktop notifications.
+- **Medication Reminders:** Review suggested schedules, confirm them, and get due and missed reminders in the app while it is open.
 - **Prescription History:** Access previously scanned prescriptions.
 - **Prescription Deletion:** Delete individual prescriptions or clear prescription history.
 - **User Authentication:** Secure registration and login functionality.
@@ -27,7 +27,6 @@ MediMind is an AI-powered healthcare application designed to simplify prescripti
 | Authentication | Supabase Auth |
 | AI Integration | AI model API |
 | Deployment | Vercel, Render |
-| Desktop | Electron |
 
 ## 🏗️ Architecture
 
@@ -54,7 +53,12 @@ cd medimind-frontend
 
 npm install
 
+cp .env.example .env   # then fill in the Supabase values
+
 npx expo start
+
+npm run typecheck      # TypeScript check
+npm run lint
 ```
 
 ### Backend
@@ -69,7 +73,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Configure the required environment variables for Supabase and the backend API before running the application.
+The backend reads `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `OPENROUTER_API_KEY` and, optionally, `OPENROUTER_MODEL` and `ALLOWED_ORIGINS` (see `.env.example` in each repository). Run its tests with `pip install -r requirements-dev.txt && pytest`.
 
 ## 👨‍💻 Developer
 

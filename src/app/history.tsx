@@ -1,688 +1,238 @@
-import { apiFetch } from '../lib/api';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Button, Disclaimer, PageHeader, Screen, SectionHeader, StateCard } from '@/components/ui';
+import { Colors } from '@/constants/colors';
+import { PRESCRIPTIONS_KEY, usePrescriptions } from '@/hooks/use-api-data';
+import { apiJson } from '@/lib/api';
+import { confirmAction, notify } from '@/lib/feedback';
 
-interface Medication {
-  name: string;
-  dosage: string;
-}
+const PREVIEW_LIMIT = 4;
 
-interface Prescription {
-  id: number;
-  doctor_notes?: string;
-  medications: Medication[];
-  created_at?: string;
-}
+const formatDate = (date?: string | null) => {
+  if (!date) return 'Saved prescription';
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return 'Saved prescription';
+
+  return parsed.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 export default function HistoryScreen() {
-  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
-  const [confirmClearAll, setConfirmClearAll] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [clearingAll, setClearingAll] = useState(false);
+  const { data, error, isLoading, isValidating, mutate } = usePrescriptions();
+  const [deletingId, setDeletingId] = useState<number | 'all' | null>(null);
 
-  const loadHistory = async () => {
-    setLoading(true);
-    setError('');
+  const prescriptions = data ?? [];
+  const medicationCount = prescriptions.reduce((total, item) => total + item.medications.length, 0);
+  const busy = deletingId !== null;
 
-    try {
-      const response = await apiFetch('/api/v1/prescriptions');
-
-      if (!response.ok) {
-        let message = 'Unable to load prescription history.';
-        try {
-          const body = await response.json();
-          message = body.detail || message;
-        } catch {
-          // Keep the default message if the response is not JSON.
-        }
-        throw new Error(message);
-      }
-
-      const data = await response.json();
-      setPrescriptions(data);
-    } catch (err: any) {
-      setError(err.message || 'Could not connect to MediMind.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  const formatDate = (date?: string) => {
-    if (!date) return 'Saved prescription';
-
-    const parsed = new Date(date);
-
-    if (Number.isNaN(parsed.getTime())) return 'Saved prescription';
-
-    return parsed.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+  const deletePrescription = async (id: number) => {
+    const confirmed = await confirmAction({
+      title: 'Delete this prescription?',
+      message:
+        'Its saved medication entries will also be deleted. Any reminders you created from it are kept.',
     });
-  };
 
-  const deletePrescription = async (prescriptionId: number) => {
-    if (deletingId !== null || clearingAll) return;
+    if (!confirmed) return;
 
-    setDeletingId(prescriptionId);
-    setError('');
-
+    setDeletingId(id);
     try {
-      const response = await apiFetch(
-        `/api/v1/prescriptions/${prescriptionId}`,
+      await apiJson(
+        `${PRESCRIPTIONS_KEY}/${id}`,
         { method: 'DELETE' },
+        'Unable to delete this prescription.',
       );
-
-      if (!response.ok) {
-        let message = 'Unable to delete this prescription.';
-        try {
-          const body = await response.json();
-          message = body.detail || message;
-        } catch {
-          // Keep the default message if the response is not JSON.
-        }
-        throw new Error(message);
-      }
-
-      setPrescriptions((current) =>
-        current.filter((item) => item.id !== prescriptionId),
-      );
-      setPendingDeleteId(null);
+      await mutate((current) => current?.filter((item) => item.id !== id), {
+        revalidate: false,
+      });
     } catch (err: any) {
-      setError(err.message || 'Could not delete this prescription.');
+      notify('Deletion failed', err?.message || 'Could not delete this prescription.');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const deleteAllPrescriptions = async () => {
-    if (clearingAll || deletingId !== null) return;
+  const clearAll = async () => {
+    const confirmed = await confirmAction({
+      title: 'Delete all prescriptions?',
+      message:
+        'This permanently deletes every prescription in your account and its medication records. Your reminders are kept.',
+      confirmLabel: 'Delete all',
+    });
 
-    setClearingAll(true);
-    setError('');
+    if (!confirmed) return;
 
+    setDeletingId('all');
     try {
-      const response = await apiFetch('/api/v1/prescriptions', {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        let message = 'Unable to clear prescription history.';
-        try {
-          const body = await response.json();
-          message = body.detail || message;
-        } catch {
-          // Keep the default message if the response is not JSON.
-        }
-        throw new Error(message);
-      }
-
-      setPrescriptions([]);
-      setConfirmClearAll(false);
-      setPendingDeleteId(null);
+      await apiJson(PRESCRIPTIONS_KEY, { method: 'DELETE' }, 'Unable to clear prescription history.');
+      await mutate([], { revalidate: false });
     } catch (err: any) {
-      setError(err.message || 'Could not clear prescription history.');
+      notify('Could not clear history', err?.message || 'Please try again.');
     } finally {
-      setClearingAll(false);
+      setDeletingId(null);
     }
   };
 
-  const medicationCount = prescriptions.reduce(
-    (total, item) => total + (item.medications?.length || 0),
-    0,
-  );
-
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.eyebrow}>YOUR RECORDS</Text>
-      <Text style={styles.title}>Prescription history.</Text>
-      <Text style={styles.description}>
-        All your previously scanned prescriptions, organised in one place.
-      </Text>
+    <Screen onRefresh={() => void mutate()} refreshing={isValidating && !isLoading}>
+      <PageHeader
+        eyebrow="YOUR RECORDS"
+        title="Prescription history."
+        description="All your previously scanned prescriptions, organised in one place."
+      />
 
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>
-            {loading ? '—' : prescriptions.length}
-          </Text>
+          <Text style={styles.summaryNumber}>{isLoading ? '—' : prescriptions.length}</Text>
           <Text style={styles.summaryLabel}>Prescriptions</Text>
         </View>
-
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>
-            {loading ? '—' : medicationCount}
-          </Text>
+          <Text style={styles.summaryNumber}>{isLoading ? '—' : medicationCount}</Text>
           <Text style={styles.summaryLabel}>Medication entries</Text>
         </View>
       </View>
 
-      {!loading && !error && prescriptions.length > 0 && (
-        <View style={styles.clearAllContainer}>
-          {confirmClearAll ? (
-            <View style={styles.confirmCard}>
-              <Text style={styles.confirmTitle}>Delete all prescriptions?</Text>
-              <Text style={styles.confirmDescription}>
-                This permanently deletes all prescriptions in your account and
-                their associated medication records. Your separately configured
-                medication reminders will be kept.
-              </Text>
-              <View style={styles.confirmActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setConfirmClearAll(false)}
-                  disabled={clearingAll}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.confirmDeleteButton}
-                  onPress={deleteAllPrescriptions}
-                  disabled={clearingAll}
-                >
-                  {clearingAll ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.confirmDeleteText}>Delete all</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.clearAllButton}
-              onPress={() => {
-                setPendingDeleteId(null);
-                setConfirmClearAll(true);
-              }}
-              disabled={deletingId !== null || clearingAll}
-            >
-              <Text style={styles.clearAllText}>Clear all history</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+      <SectionHeader
+        title="Recent activity"
+        actionLabel="Refresh"
+        onAction={() => void mutate()}
+      />
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent activity</Text>
-        <TouchableOpacity onPress={loadHistory} disabled={loading || clearingAll || deletingId !== null}>
-          <Text style={styles.refreshText}>Refresh ↻</Text>
-        </TouchableOpacity>
-      </View>
-
-      {error ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      {loading ? (
-        <View style={styles.stateCard}>
-          <ActivityIndicator size="large" color="#0D9488" />
-          <Text style={styles.stateText}>Loading your records...</Text>
-        </View>
+      {isLoading ? (
+        <StateCard loading message="Loading your records..." />
+      ) : error ? (
+        <StateCard
+          title="Unable to load history"
+          message={error.message}
+          actionLabel="Try again"
+          onAction={() => void mutate()}
+        />
       ) : prescriptions.length === 0 ? (
-        <View style={styles.stateCard}>
-          <Text style={styles.emptyIcon}>▤</Text>
-          <Text style={styles.stateTitle}>No prescriptions yet</Text>
-          <Text style={styles.stateText}>
-            Your scanned prescriptions will appear here after you upload them.
-          </Text>
-        </View>
+        <StateCard
+          title="No prescriptions yet"
+          message="Your scanned prescriptions will appear here after you upload them."
+        />
       ) : (
-        prescriptions.map((prescription) => (
-          <View key={prescription.id} style={styles.prescriptionCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.documentIcon}>
-                <Text style={styles.documentIconText}>▤</Text>
-              </View>
-
-              <View style={styles.cardHeading}>
-                <Text style={styles.cardTitle}>
-                  Prescription #{prescription.id}
-                </Text>
-                <Text style={styles.cardDate}>
-                  {formatDate(prescription.created_at)}
-                </Text>
-              </View>
-
-              <View style={styles.savedBadge}>
-                <Text style={styles.savedBadgeText}>Saved</Text>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <Text style={styles.medicationCount}>
-              {prescription.medications?.length || 0} medication entries
-            </Text>
-
-            {(prescription.medications || []).slice(0, 4).map((medication, index) => (
-              <View key={index} style={styles.medicationRow}>
-                <View style={styles.bullet} />
-                <Text style={styles.medicationName}>
-                  {medication.name || 'Unknown medication'}
-                </Text>
-                <Text style={styles.dosage}>
-                  {medication.dosage || '—'}
-                </Text>
-              </View>
-            ))}
-
-            {(prescription.medications?.length || 0) > 4 && (
-              <Text style={styles.moreText}>
-                +{prescription.medications.length - 4} more medications
-              </Text>
-            )}
-
-            {prescription.doctor_notes ? (
-              <View style={styles.notesCard}>
-                <Text style={styles.notesLabel}>DOCTOR'S NOTES</Text>
-                <Text style={styles.notesText}>
-                  {prescription.doctor_notes}
-                </Text>
-              </View>
-            ) : null}
-
-            {pendingDeleteId === prescription.id ? (
-              <View style={styles.inlineConfirm}>
-                <Text style={styles.confirmTitle}>Delete this prescription?</Text>
-                <Text style={styles.confirmDescription}>
-                  Its associated medication entries will also be deleted.
-                  Any linked reminders will be preserved.
-                </Text>
-                <View style={styles.confirmActions}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => setPendingDeleteId(null)}
-                    disabled={deletingId !== null}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.confirmDeleteButton}
-                    onPress={() => deletePrescription(prescription.id)}
-                    disabled={deletingId !== null}
-                  >
-                    {deletingId === prescription.id ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.confirmDeleteText}>Delete</Text>
-                    )}
-                  </TouchableOpacity>
+        <>
+          {prescriptions.map((prescription) => (
+            <View key={prescription.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.flex}>
+                  <Text style={styles.cardTitle}>Prescription #{prescription.id}</Text>
+                  <Text style={styles.cardDate}>{formatDate(prescription.created_at)}</Text>
+                </View>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {prescription.medications.length}{' '}
+                    {prescription.medications.length === 1 ? 'medicine' : 'medicines'}
+                  </Text>
                 </View>
               </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => {
-                  setConfirmClearAll(false);
-                  setPendingDeleteId(prescription.id);
-                }}
-                disabled={deletingId !== null || clearingAll}
-              >
-                <Text style={styles.deleteButtonText}>Delete prescription</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ))
+
+              <View style={styles.divider} />
+
+              {prescription.medications.slice(0, PREVIEW_LIMIT).map((medication, index) => (
+                <View key={`${medication.name}-${index}`} style={styles.medicationRow}>
+                  <View style={styles.bullet} />
+                  <Text style={styles.medicationName} numberOfLines={1}>
+                    {medication.name || 'Unknown medication'}
+                  </Text>
+                  <Text style={styles.dosage}>{medication.dosage || '—'}</Text>
+                </View>
+              ))}
+
+              {prescription.medications.length > PREVIEW_LIMIT ? (
+                <Text style={styles.more}>
+                  +{prescription.medications.length - PREVIEW_LIMIT} more medications
+                </Text>
+              ) : null}
+
+              {prescription.doctor_notes ? (
+                <View style={styles.notes}>
+                  <Text style={styles.notesLabel}>DOCTOR&apos;S NOTES</Text>
+                  <Text style={styles.notesText}>{prescription.doctor_notes}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.cardAction}>
+                <Button
+                  label="Delete prescription"
+                  variant="danger"
+                  onPress={() => void deletePrescription(prescription.id)}
+                  loading={deletingId === prescription.id}
+                  disabled={busy}
+                />
+              </View>
+            </View>
+          ))}
+
+          <Button
+            label="Clear all history"
+            variant="secondary"
+            onPress={() => void clearAll()}
+            loading={deletingId === 'all'}
+            disabled={busy}
+          />
+        </>
       )}
 
-      <View style={styles.disclaimerCard}>
-        <Text style={styles.disclaimerTitle}>Your health records matter</Text>
-        <Text style={styles.disclaimerText}>
-          Extracted prescription details may contain errors. Keep your original
-          prescription and verify medication instructions with your clinician.
-        </Text>
-      </View>
-    </ScrollView>
+      <Disclaimer title="Your health records matter">
+        Extracted prescription details may contain errors. Keep your original prescription and
+        verify medication instructions with your clinician.
+      </Disclaimer>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F7FAFC',
-  },
-  content: {
-    padding: 24,
-    paddingBottom: 50,
-    width: '100%',
-    maxWidth: 900,
-    alignSelf: 'center',
-  },
-  eyebrow: {
-    color: '#0D9488',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginTop: 12,
-  },
-  title: {
-    color: '#102A43',
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: -1,
-    marginTop: 12,
-  },
-  description: {
-    color: '#64788B',
-    fontSize: 14,
-    lineHeight: 23,
-    marginTop: 10,
-    marginBottom: 24,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
+  flex: { flex: 1 },
+  summaryRow: { flexDirection: 'row', gap: 12 },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
     padding: 18,
+  },
+  summaryNumber: { color: Colors.ink, fontSize: 28, fontWeight: '800' },
+  summaryLabel: { color: Colors.subtle, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#EAF0F4',
-  },
-  summaryNumber: {
-    color: '#102A43',
-    fontSize: 27,
-    fontWeight: '800',
-  },
-  summaryLabel: {
-    color: '#8293A5',
-    fontSize: 11,
-    marginTop: 5,
-  },
-  clearAllContainer: {
-    marginBottom: 25,
-  },
-  clearAllButton: {
-    alignSelf: 'flex-end',
-    borderWidth: 1,
-    borderColor: '#F0C9C9',
-    backgroundColor: '#FFF7F7',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  clearAllText: {
-    color: '#B42318',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  confirmCard: {
-    backgroundColor: '#FFF7F7',
-    borderColor: '#F0C9C9',
-    borderWidth: 1,
-    borderRadius: 13,
-    padding: 16,
-  },
-  inlineConfirm: {
-    marginTop: 16,
-    backgroundColor: '#FFF7F7',
-    borderColor: '#F0C9C9',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 13,
-  },
-  confirmTitle: {
-    color: '#102A43',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  confirmDescription: {
-    color: '#64788B',
-    fontSize: 11,
-    lineHeight: 17,
-    marginTop: 6,
-  },
-  confirmActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 9,
-    marginTop: 13,
-  },
-  cancelButton: {
-    borderWidth: 1,
-    borderColor: '#D8E1E8',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: 9,
-    minWidth: 75,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    color: '#52677A',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  confirmDeleteButton: {
-    backgroundColor: '#B42318',
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-    borderRadius: 9,
-    minWidth: 85,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmDeleteText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    color: '#102A43',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  refreshText: {
-    color: '#0F766E',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  stateCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 17,
-    padding: 27,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EAF0F4',
-  },
-  stateTitle: {
-    color: '#102A43',
-    fontSize: 16,
-    fontWeight: '800',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  stateText: {
-    color: '#8293A5',
-    fontSize: 12,
-    lineHeight: 19,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  emptyIcon: {
-    color: '#0D9488',
-    fontSize: 34,
-  },
-  errorCard: {
-    backgroundColor: '#FFF7F7',
-    borderColor: '#F0C9C9',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 13,
-    marginBottom: 14,
-  },
-  errorText: {
-    color: '#B42318',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  prescriptionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 17,
+    borderColor: Colors.border,
     padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#EAF0F4',
+    marginBottom: 12,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardTitle: { color: Colors.ink, fontSize: 15, fontWeight: '800' },
+  cardDate: { color: Colors.subtle, fontSize: 12, marginTop: 3 },
+  badge: {
+    backgroundColor: Colors.tint,
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
   },
-  documentIcon: {
-    width: 43,
-    height: 43,
-    borderRadius: 13,
-    backgroundColor: '#E6F5F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  documentIconText: {
-    color: '#0F766E',
-    fontSize: 22,
-  },
-  cardHeading: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: '#102A43',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  cardDate: {
-    color: '#8293A5',
-    fontSize: 11,
-    marginTop: 4,
-  },
-  savedBadge: {
-    backgroundColor: '#E8F6EF',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  savedBadgeText: {
-    color: '#24734E',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#EEF2F5',
-    marginVertical: 15,
-  },
-  medicationCount: {
-    color: '#8293A5',
-    fontSize: 10,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  medicationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-  },
-  bullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#0D9488',
-    marginRight: 9,
-  },
-  medicationName: {
-    color: '#52677A',
-    fontSize: 12,
-    flex: 1,
-  },
-  dosage: {
-    color: '#0F766E',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  moreText: {
-    color: '#0F766E',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 6,
-  },
-  deleteButton: {
-    alignSelf: 'flex-start',
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#F0C9C9',
-    backgroundColor: '#FFF7F7',
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 9,
-  },
-  deleteButtonText: {
-    color: '#B42318',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  notesCard: {
-    backgroundColor: '#F3F7FA',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
-  },
+  badgeText: { color: Colors.primary, fontSize: 11, fontWeight: '800' },
+  divider: { height: 1, backgroundColor: '#EEF3F6', marginVertical: 14 },
+  medicationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
+  bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.accent },
+  medicationName: { flex: 1, color: Colors.ink, fontSize: 13, fontWeight: '700' },
+  dosage: { color: Colors.muted, fontSize: 12 },
+  more: { color: Colors.subtle, fontSize: 12, marginTop: 6 },
+  notes: { backgroundColor: Colors.noticeTint, borderRadius: 11, padding: 13, marginTop: 14 },
   notesLabel: {
-    color: '#8293A5',
+    color: '#9A6B15',
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1,
+    marginBottom: 5,
   },
-  notesText: {
-    color: '#52677A',
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
-  },
-  disclaimerCard: {
-    backgroundColor: '#EDF6F5',
-    borderRadius: 14,
-    padding: 17,
-    marginTop: 13,
-  },
-  disclaimerTitle: {
-    color: '#164E50',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  disclaimerText: {
-    color: '#526D72',
-    fontSize: 11,
-    lineHeight: 18,
-    marginTop: 7,
-  },
+  notesText: { color: Colors.notice, fontSize: 12, lineHeight: 19 },
+  cardAction: { marginTop: 16 },
 });

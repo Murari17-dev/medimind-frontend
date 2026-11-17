@@ -1,50 +1,63 @@
-import AuthGate from '../components/AuthGate';
-
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 
-const icons: Record<string, string> = {
-  index: '⌂',
-  scan: '＋',
-  medications: '▤',
-  reminders: '◷',
-  history: '◷',
-  profile: '○',
-};
+import AuthGate from '@/components/AuthGate';
+import { DueRemindersBanner } from '@/components/due-reminders-banner';
+import { Colors } from '@/constants/colors';
+
+type IconName = keyof typeof Ionicons.glyphMap;
+
+const TABS: { name: string; title: string; icon: IconName; activeIcon: IconName }[] = [
+  { name: 'index', title: 'Home', icon: 'home-outline', activeIcon: 'home' },
+  { name: 'scan', title: 'Scan', icon: 'scan-outline', activeIcon: 'scan' },
+  { name: 'medications', title: 'Medicines', icon: 'medkit-outline', activeIcon: 'medkit' },
+  { name: 'reminders', title: 'Reminders', icon: 'alarm-outline', activeIcon: 'alarm' },
+  { name: 'history', title: 'History', icon: 'document-text-outline', activeIcon: 'document-text' },
+  { name: 'profile', title: 'Profile', icon: 'person-outline', activeIcon: 'person' },
+];
 
 export default function RootLayout() {
   return (
     <AuthGate>
-    <Tabs
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: '#0F766E',
-        tabBarInactiveTintColor: '#94A3B8',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5EDF2',
-          height: 66,
-          paddingTop: 8,
-          paddingBottom: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
-        tabBarIcon: ({ color }) => (
-          <Text style={{ color, fontSize: 21 }}>
-            {icons[route.name] || '•'}
-          </Text>
-        ),
-      })}
-    >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="scan" options={{ title: 'Scan' }} />
-      <Tabs.Screen name="medications" options={{ title: 'Medicines' }} />
-      <Tabs.Screen name="reminders" options={{ title: 'Reminders' }} />
-      <Tabs.Screen name="history" options={{ title: 'History' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-    </Tabs>
+      <StatusBar style="dark" />
+      <View style={{ flex: 1 }}>
+        <DueRemindersBanner />
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: Colors.primary,
+            tabBarInactiveTintColor: Colors.inactive,
+            tabBarStyle: {
+              backgroundColor: Colors.surface,
+              borderTopColor: Colors.border,
+              height: 68,
+              paddingTop: 6,
+              paddingBottom: 8,
+            },
+            tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+            tabBarLabelPosition: 'below-icon',
+          }}
+        >
+          {TABS.map((tab) => (
+            <Tabs.Screen
+              key={tab.name}
+              name={tab.name}
+              options={{
+                title: tab.title,
+                tabBarIcon: ({ color, focused, size }) => (
+                  <Ionicons
+                    name={focused ? tab.activeIcon : tab.icon}
+                    size={size}
+                    color={color as string}
+                  />
+                ),
+              }}
+            />
+          ))}
+        </Tabs>
+      </View>
     </AuthGate>
   );
 }

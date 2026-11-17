@@ -2,14 +2,20 @@
   "expo": {
     "name": "MediMind",
     "slug": "medimind-mobile",
+    "scheme": "medimind",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.medimind.app"
     },
     "android": {
       "package": "com.medimind.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
     },
     "extra": {
       "eas": {
@@ -18,7 +24,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MediMind needs access to your photos so you can upload a prescription.",
+          "cameraPermission": "MediMind needs the camera so you can take a photo of a prescription."
+        }
+      ]
     ]
   }
 }
