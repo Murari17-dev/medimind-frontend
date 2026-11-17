@@ -95,6 +95,23 @@ export default function CreatorTestCard() {
               Page {item.page}: {item.status === 'processed' ? JSON.stringify(item.extraction) : item.error}
             </Text>
           ))}
+          {['completed', 'failed'].includes(evaluation.status) && (
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: '#8A2C2C' }]}
+              onPress={async () => {
+                try {
+                  const response = await apiFetch('/api/v1/creator/evaluations/' + evaluation.id, { method: 'DELETE' });
+                  if (!response.ok) throw new Error('Could not delete this evaluation.');
+                  setEvaluation(null);
+                  setError('');
+                } catch (e: any) {
+                  setError(e.message || 'Could not delete this evaluation.');
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Delete evaluation results</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
