@@ -16,6 +16,7 @@ export async function disableDesktopPush() {
   const registration = await navigator.serviceWorker.getRegistration('/');
   const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return;
+  const { data: { session } } = await supabase.auth.getSession();
   try {
     await apiFetch('/api/v1/push/subscribe', {
       method: 'DELETE',
@@ -24,6 +25,7 @@ export async function disableDesktopPush() {
     });
   } finally {
     await subscription.unsubscribe();
+    if (session) localStorage.removeItem('medimindPushUser:' + session.user.id);
   }
 }
 
@@ -34,9 +36,14 @@ export default function DesktopPushSettings() {
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.ready
-      .then((registration) => registration.pushManager.getSubscription())
-      .then((subscription) => setEnabled(!!subscription))
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      return navigator.serviceWorker.ready
+        .then((registration) => registration.pushManager.getSubscription())
+        .then((subscription) => setEnabled(
+          !!subscription && localStorage.getItem('medimindPushUser:' + session.user.id) === subscription.endpoint
+        ));
+    })
       .catch(() => setEnabled(false));
   }, []);
 
@@ -57,7 +64,7 @@ export default function DesktopPushSettings() {
         if (!VAPID_PUBLIC_KEY) throw new Error('Desktop push is not configured yet.');
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') throw new Error('Allow notifications in your browser to continue.');
-        const subscription = await registration.pushManager.subscribe({
+        const subscription = await registration.pushManager.getSubscription() || await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: decodeKey(VAPID_PUBLIC_KEY),
         });
@@ -67,6 +74,7 @@ export default function DesktopPushSettings() {
           body: JSON.stringify(subscription.toJSON()),
         });
         if (!response.ok) throw new Error('Could not save this desktop subscription.');
+        localStorage.setItem('medimindPushUser:' + session.user.id, subscription.endpoint);
         setEnabled(true);
         setMessage('Reminders can now reach this desktop when the website is closed.');
       }
