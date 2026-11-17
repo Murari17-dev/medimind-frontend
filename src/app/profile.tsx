@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import CreatorTestCard from '../components/CreatorTestCard';
 
 import React from 'react';
 import {
@@ -82,6 +83,8 @@ export default function ProfileScreen() {
       >
         <Text style={styles.signOutText}>Sign out</Text>
       </TouchableOpacity>
+
+      <CreatorTestCard />
 
       <Text style={styles.sectionTitle}>Preferences</Text>
 
