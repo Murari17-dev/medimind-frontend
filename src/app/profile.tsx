@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import CreatorTestCard from '../components/CreatorTestCard';
+import DesktopPushSettings, { disableDesktopPush } from '../components/DesktopPushSettings';
 
 import React from 'react';
 import {
@@ -77,6 +78,7 @@ export default function ProfileScreen() {
       <TouchableOpacity
         style={styles.signOutButton}
         onPress={async () => {
+          await disableDesktopPush().catch(() => undefined);
           const { error } = await supabase.auth.signOut();
           if (error) showMessage('Sign out failed', error.message);
         }}
@@ -84,6 +86,7 @@ export default function ProfileScreen() {
         <Text style={styles.signOutText}>Sign out</Text>
       </TouchableOpacity>
 
+      <DesktopPushSettings />
       <CreatorTestCard />
 
       <Text style={styles.sectionTitle}>Preferences</Text>
