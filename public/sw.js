@@ -4,8 +4,6 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'MediMind medication reminder';
   const options = {
     body: payload.body || 'It is time for your scheduled medication.',
-    icon: '/icon.png',
-    badge: '/icon.png',
     tag: payload.tag || 'medimind-reminder',
     renotify: false,
     data: { url: payload.url || '/' },
